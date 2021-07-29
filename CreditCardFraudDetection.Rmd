@@ -1,0 +1,235 @@
+---
+title: "CreditCardFraudDetection"
+author: "Kiana"
+date: "7/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load packages
+
+```{r loadpackages,warning=FALSE, message=FALSE, results='hide'}
+library(tidyverse)
+library(caret)
+library(data.table)
+library(ROSE)
+library(rpart)
+library(rpart.plot)
+library(Rtsne)
+library(randomForest)
+library(xgboost)
+library(Matrix)
+library(corrplot)
+```
+
+## Load data
+Data Source: https://www.kaggle.com/mlg-ulb/creditcardfraud
+Class variable = 0 - Not Fraud, 1 - Fraud
+
+```{r ReadData}
+CCTransactions <- read.csv("creditcard.csv")
+head(CCTransactions)
+
+#check for NA values
+colSums(is.na(CCTransactions))
+
+#change class to factor
+CCTransactions$Class = factor(CCTransactions$Class)
+
+#label the class variable
+class_names <- c('1' = 'Fraud', '0' = 'No Fraud')
+```
+
+## Exploratory Data Analysis
+
+```{r CheckBalance}
+table(CCTransactions$Class)
+
+#percentage of imbalance
+100*prop.table(table(CCTransactions$Class))
+
+#visualize class distribution
+ggplot(CCTransactions, aes(x = Class)) + geom_bar() + 
+  scale_x_discrete(labels = c("No Fraud", "Fraud")) +
+  ggtitle("Number of class labels")
+```
+
+```{r ExploreTime}
+#distribution of non-fraud and fraud over time
+CCTransactions %>%
+  ggplot(aes(x = Time, fill = factor(Class))) + geom_histogram(bins = 80)+
+  scale_x_discrete(labels = c("no fraud", "fraud")) +
+  labs(x = 'Time in seconds since first transaction', y = '# of transactions') +
+  ggtitle('Distribution of time of transaction by class') +
+  facet_grid(Class ~ ., scales = 'free_y', labeller = as_labeller(class_names))
+```
+
+```{r ExploreAmounts}
+#boxplot showing distribution of transaction amounts by class
+ggplot(CCTransactions, aes(x = factor(Class), y = Amount)) + geom_boxplot() +
+  scale_x_discrete(labels = c("No Fraud", "Fraud")) +
+  labs(x = 'Class', y = 'Amount') +
+  ggtitle("Distribution of transaction amount by class")
+
+#mean and median values of transaction amounts for fraud and non-fraud
+CCTransactions %>%
+  group_by(Class) %>%
+  summarise(mean(Amount), median(Amount))
+```
+
+```{r ExploreTimeandAmounts}
+#create dataframe with only fraud transactions
+FraudTransactions <- CCTransactions %>%
+  filter(Class == "1")
+
+#create dataframe with only non-fraud transactions
+NonFraudTransactions <- CCTransactions %>%
+  filter(Class == "0")
+
+#amount of fraud over time
+ggplot(FraudTransactions, aes(x = Time, y = Amount)) +
+  geom_point() +
+  ggtitle("Fraud by Amount and Time")
+
+#amount of non-fraud over time
+ggplot(NonFraudTransactions, aes(x = Time, y = Amount)) +
+  geom_point() +
+  ggtitle("Non-Fraud by Amount and Time")
+
+#visualize fraud and non-fraud by amount and time
+ggplot(CCTransactions, aes(x = Time, y = Amount, shape = Class, color = Class)) + geom_point() +
+  ylim(0,5000)+
+  ggtitle("Fraud by Amount and Time")
+```
+
+```{r ExploreCorrelation}
+#create data table and change class to numeric
+CC.dt <- setDT(CCTransactions)
+CC.dt$Class <- as.numeric(CC.dt$Class)
+
+correlations <- cor(CC.dt[,], method="pearson")
+round(correlations, 2)
+
+corrplot(correlations, number.cex = .9, type = "upper",
+              method = "color", tl.cex=0.8,tl.col = "black")
+```
+
+##Build Models - CART, Logistic Regression, Random Forest, XGBoost
+
+```{r PrepData}
+#split into train and test datasets
+set.seed(123)
+smp_size <- floor(0.7 * nrow(CCTransactions))
+train_ind <- sample(seq_len(nrow(CCTransactions)), size = smp_size)
+train <- CCTransactions[train_ind, ]
+test <- CCTransactions[-train_ind, ]
+
+#oversampling (b/c data is unbalanced)
+set.seed(12345)
+overtrain <- ovun.sample(Class ~ ., data = train, method = "over")$data
+
+set.seed(12345)
+overtest <- ovun.sample(Class ~ ., data = test, method = "over")$data
+
+#how many non-fraud and fraud in the training and test data
+overtrain %>%
+  group_by(Class) %>%
+  summarize(length(Class))
+
+overtest %>%
+  group_by(Class) %>%
+  summarize(length(Class))
+
+```
+
+```{r CARTmodel}
+#Generate CART Model
+set.seed(1234)
+CART_model <- rpart(Class ~ ., data = overtrain, method = "class")
+print(CART_model)
+
+#plotting the tree
+rpart.plot(CART_model)
+
+#rules from the generated tree
+rpart.rules(CART_model)
+
+#prediction
+test.pred <- predict(CART_model, newdata = overtest, method = "class")
+test.pred <- as.data.table(test.pred)
+target.class <- as.factor(ifelse(test.pred[,2] > 0.5, "1", "0"))
+
+#confusion matrix with 50% probability
+confusionMatrix(target.class, overtest$Class, positive = "1")
+
+#area under the curve(AUC)
+roc.curve(overtest$Class, target.class, plotit = TRUE)
+
+#store CART model results
+CART_results<-data.frame("CART Model", "0.9078","0.902")
+names(CART_results)<-c("Model Name", "Accuracy","AUC")
+CART_results
+```
+```{r LogisticRegression}
+set.seed(12345)
+log_mod <- glm(Class ~ ., family = "binomial"(link = "logit"), data = overtrain)
+summary(log_mod)
+
+#prediction
+pred_LR <- predict(log_mod, newdata = overtest, type = "response")
+
+#save confusion matrix in LRtable
+LRtable <- table(pred_LR > 0.5, overtest$Class)
+LRtable
+
+#calculate accuracy
+LR_accuracy <- (LRtable[1,1]+LRtable[2,2])/(LRtable[1,1]+LRtable[2,1]+LRtable[1,2]+LRtable[2,2])
+LR_accuracy
+
+#calculate AUC
+roc.curve(overtest$Class, pred_LR, plotit = TRUE)
+
+#store Logistic Regression model results
+LR_results<-data.frame("Logistic Regression Model", "0.9302","0.979")
+names(LR_results)<-c("Model Name", "Accuracy","AUC")
+LR_results
+```
+
+```{r RandomForestModel}
+memory.limit(size = 15000)
+overtrain_rf <- randomForest(as.factor(Class) ~ ., data = overtrain, ntree = 300, mtry = 6, importance = TRUE)
+overtrain_rf
+
+#variable importance
+importance <- data.frame(overtrain_rf$importance)
+
+#plot the variable importance 
+ggplot(importance, aes(x=reorder(rownames(importance),MeanDecreaseGini), y=MeanDecreaseGini)) +
+  geom_bar(stat="identity", fill="lightblue") + theme_bw(base_size = 8) +
+  coord_flip() +
+  labs(title="Variable Importance", x="Variable", y="Variable importance")
+
+#prediction
+pred_RF <- as.factor(predict(overtrain_rf, newdata = overtest))
+
+#confusion matrix
+conf_RF <- confusionMatrix(pred_RF, overtest$Class, positive = "1")
+conf_RF
+
+#area under the curve(AUC)
+roc.curve(overtest$Class, pred_RF, plotit = TRUE)
+
+#store Logistic Regression model results
+RF_results<-data.frame("Random Forest Model", "0.8886","0.889")
+names(RF_results)<-c("Model Name", "Accuracy","AUC")
+RF_results
+```
+
+```{r ModelAssessment}
+ModelMetrics <- rbind(CART_results, LR_results, RF_results)
+ModelMetrics
+```
+
