@@ -25,3 +25,6 @@ The dataset comes from Kaggle - [Credit Card Fraud Detection](https://www.kaggle
 5. Built visualizations to show metrics of the data and transactions
 
 ## Credit Card Fraud Prediction Dashboard
+![CCTransaction Metrics](https://github.com/KianaDean/Credit-Card-Fraud-Detection/blob/fc06761b649699883b386ea884c8bbcb5311cee3/images/CCFraudMetrics.PNG)
+
+![CCTransaction Metrics](https://github.com/KianaDean/Credit-Card-Fraud-Detection/blob/fc06761b649699883b386ea884c8bbcb5311cee3/images/CCFraudTransactions.PNG)
