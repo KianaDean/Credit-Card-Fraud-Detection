@@ -5,7 +5,7 @@ Predictive Models and a PowerBI dashbaord to detect potential credit card fraud
 Contactless payment is on the rise. The adoption rate was acclerated during the pandemic. With the increased use in credit cards this opens up the window to more fraudulent transactions. Due to the sheer amount of transactions companies need a way to detect fraud as soon as it happens.
 
 ## The Solution
-This is where predictive models can be helpful. By feeding in variables, models can be built to anaylze the features of a transaction and mark it as fraud or not fraud. This allows companies to catch the fraud sooner rather than later because a fraud transactions can have a significant impact on the business.
+This is where predictive models can be helpful. By feeding in variables, models can be built to anaylze the features of a transaction and mark it as fraud or not fraud. This allows companies to catch the fraud sooner rather than later because fraud transactions can have a significant impact on the business.
 
 ## The Data
 The dataset comes from Kaggle - [Credit Card Fraud Detection](https://www.kaggle.com/mlg-ulb/creditcardfraud). 
