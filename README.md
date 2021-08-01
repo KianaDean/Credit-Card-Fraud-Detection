@@ -24,7 +24,7 @@ The dataset comes from Kaggle - [Credit Card Fraud Detection](https://www.kaggle
 4. Created a PowerBI dashboard running the Logistic Regression R script to predict fraud transactions
 5. Built visualizations to show metrics of the data and transactions
 
-Tools Used: R, PowerBI
+**Tools Used:** R, PowerBI
 
 ## Credit Card Fraud Prediction Dashboard
 ![CCTransaction Metrics](https://github.com/KianaDean/Credit-Card-Fraud-Detection/blob/fc06761b649699883b386ea884c8bbcb5311cee3/images/CCFraudMetrics.PNG)
